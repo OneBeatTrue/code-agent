@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Service settings
     webhook_timeout: int = Field(default=30, env="WEBHOOK_TIMEOUT")
-    ci_check_interval: int = Field(default=60, env="CI_CHECK_INTERVAL")  # seconds
+    ci_check_interval: int = Field(default=60, env="CI_CHECK_INTERVAL")
     ci_max_wait_time: int = Field(default=1800, env="CI_MAX_WAIT_TIME")  # 30 minutes
 
     class Config:

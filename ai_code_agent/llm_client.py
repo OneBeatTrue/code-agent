@@ -24,7 +24,9 @@ class LLMClient:
     ) -> None:
         """Initialize the LLM client."""
         self.openai_model = openai_model
-        
+        self.openai_api_key = openai_api_key
+        self.openai_base_url = openai_base_url
+
         if not openai_api_key:
             raise ValueError("OpenAI API key is required")
         try:
@@ -33,6 +35,10 @@ class LLMClient:
                 api_key=openai_api_key,
                 base_url=openai_base_url
             )
+            logger.info(f"HERE {self.openai_model}")
+            logger.info(f"HERE {self.openai_api_key}")
+            logger.info(f"HERE {self.openai_base_url}")
+
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {e}")
             # Fallback: set to None and handle gracefully
@@ -44,17 +50,11 @@ class LLMClient:
         max_tokens: int = 4000,
         temperature: float = 0.7,
     ) -> str:
-        """Generate a response using the configured LLM."""
-        return self._generate_openai_response(messages, max_tokens, temperature)
-
-    def _generate_openai_response(
-        self,
-        messages: List[Dict[str, str]],
-        max_tokens: int,
-        temperature: float,
-    ) -> str:
         """Generate response using OpenAI API."""
         if not self.openai_client:
+            logger.info(f"HERE {self.openai_model}")
+            logger.info(f"HERE {self.openai_api_key}")
+            logger.info(f"HERE {self.openai_base_url}")
             raise ValueError(f"OpenAI client is not initialized")
         
         try:
