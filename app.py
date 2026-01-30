@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-GITHUB_SECRET = os.getenv("GITHUB_SECRET", "supersecret").encode()
-logger.info(os.getenv("GITHUB_SECRET", "supersecret"))
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret").encode()
+logger.info(os.getenv("WEBHOOK_SECRET", "supersecret"))
 
 def verify_signature(payload_body: bytes, signature_header: str) -> bool:
     if not signature_header:
@@ -37,7 +37,7 @@ def verify_signature(payload_body: bytes, signature_header: str) -> bool:
     if sha_name != "sha256":
         return False
 
-    mac = hmac.new(GITHUB_SECRET, msg=payload_body, digestmod=hashlib.sha256)
+    mac = hmac.new(WEBHOOK_SECRET, msg=payload_body, digestmod=hashlib.sha256)
     return hmac.compare_digest(mac.hexdigest(), signature)
 
 
