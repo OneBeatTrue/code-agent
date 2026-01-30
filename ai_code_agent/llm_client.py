@@ -34,7 +34,7 @@ class LLMClient:
                 base_url=openai_base_url
             )
         except Exception as e:
-            logger.error(f"Failed to initialize OpenAI client: {e}")
+            logger.error(f"Failed to initialize {openai_base_url} OpenAI client: {e}")
             # Fallback: set to None and handle gracefully
             self.openai_client = None
 
