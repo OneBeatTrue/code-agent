@@ -24,7 +24,7 @@ class LLMClient:
     ) -> None:
         """Initialize the LLM client."""
         self.openai_model = openai_model
-        
+        self.openai_base_url = openai_base_url
         if not openai_api_key:
             raise ValueError("OpenAI API key is required")
         try:
