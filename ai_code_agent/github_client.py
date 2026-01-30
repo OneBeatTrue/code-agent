@@ -40,7 +40,6 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Error getting pull request {pr_number}: {e}")
             raise
-
     def create_pull_request(
         self,
         title: str,
@@ -48,12 +47,20 @@ class GitHubClient:
         head_branch: str,
         base_branch: str = "main",
     ) -> PullRequest:
-        """Create a new pull request."""
+
+        compare = self.repo.compare(base_branch, head_branch)
+        if compare.ahead_by == 0:
+            raise ValueError(
+                f"Cannot create PR: branch '{head_branch}' has no changes"
+            )
+
+        head = f"{self.repo_owner}:{head_branch}"
+
         try:
             pr = self.repo.create_pull(
                 title=title,
                 body=body,
-                head=head_branch,
+                head=head,
                 base=base_branch,
             )
             logger.info(f"Created pull request #{pr.number}: {title}")
@@ -61,6 +68,27 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Error creating pull request: {e}")
             raise
+
+    # def create_pull_request(
+    #     self,
+    #     title: str,
+    #     body: str,
+    #     head_branch: str,
+    #     base_branch: str = "main",
+    # ) -> PullRequest:
+    #     """Create a new pull request."""
+    #     try:
+    #         pr = self.repo.create_pull(
+    #             title=title,
+    #             body=body,
+    #             head=head_branch,
+    #             base=base_branch,
+    #         )
+    #         logger.info(f"Created pull request #{pr.number}: {title}")
+    #         return pr
+    #     except Exception as e:
+    #         logger.error(f"Error creating pull request: {e}")
+    #         raise
 
     def add_comment_to_pr(self, pr_number: int, comment: str) -> None:
         """Add a comment to a pull request."""
