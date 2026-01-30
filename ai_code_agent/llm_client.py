@@ -24,7 +24,7 @@ class LLMClient:
     ) -> None:
         """Initialize the LLM client."""
         self.openai_model = openai_model
-        self.openai_base_url = openai_base_url
+        
         if not openai_api_key:
             raise ValueError("OpenAI API key is required")
         try:
@@ -55,7 +55,7 @@ class LLMClient:
     ) -> str:
         """Generate response using OpenAI API."""
         if not self.openai_client:
-            raise ValueError(f"OpenAI client ({self.openai_base_url}) is not initialized")
+            raise ValueError(f"OpenAI client is not initialized")
         
         try:
             response = self.openai_client.chat.completions.create(
