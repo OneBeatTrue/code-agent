@@ -19,7 +19,8 @@ class LLMClient:
     def __init__(
         self,
         openai_api_key: Optional[str] = None,
-        openai_model: str = "gpt-4",
+        openai_model: str = "gpt-4",    
+        openai_base_url: str = ""
     ) -> None:
         """Initialize the LLM client."""
         self.openai_model = openai_model
@@ -28,7 +29,10 @@ class LLMClient:
             raise ValueError("OpenAI API key is required")
         try:
             # Try to create OpenAI client with minimal parameters to avoid compatibility issues
-            self.openai_client = OpenAI(api_key=openai_api_key)
+            self.openai_client = OpenAI(
+                api_key=openai_api_key,
+                base_url=openai_base_url
+            )
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {e}")
             # Fallback: set to None and handle gracefully

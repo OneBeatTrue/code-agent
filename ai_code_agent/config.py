@@ -18,6 +18,8 @@ class Config(BaseSettings):
     # OpenAI Configuration
     openai_api_key: str = Field(..., env="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+    openai_base_url: str = Field(default="https://openrouter.ai/api/v1/chat/completions", env="OPENAI_BASE_URL")  
+
 
     # Agent Configuration
     max_iterations: int = Field(default=5, env="MAX_ITERATIONS")

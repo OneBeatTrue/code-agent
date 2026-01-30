@@ -24,6 +24,7 @@ class SDLCOrchestrator:
         self.llm_client = LLMClient(
             openai_api_key=settings.openai_api_key,
             openai_model=settings.openai_model,
+            openai_base_url=settings.openai_base_url
         )
         
         # Note: GitHub client and agents will be created per-request with proper credentials

@@ -25,7 +25,8 @@ class Settings(BaseSettings):
 
     # LLM settings
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")  
+    openai_base_url: str = Field(default="https://openrouter.ai/api/v1/chat/completions", env="OPENAI_BASE_URL")  
 
     # Agent settings
     max_iterations: int = Field(default=5, env="MAX_ITERATIONS")
