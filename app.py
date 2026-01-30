@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 GITHUB_SECRET = os.getenv("GITHUB_SECRET", "supersecret").encode()
+logger.info(os.getenv("GITHUB_SECRET", "supersecret"))
 
 def verify_signature(payload_body: bytes, signature_header: str) -> bool:
     if not signature_header:
