@@ -1,5 +1,3 @@
-"""GitHub client for interacting with GitHub API."""
-
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -9,16 +7,11 @@ from github.Issue import Issue
 from github.PullRequest import PullRequest
 from github.Repository import Repository
 
-# Configuration will be passed as parameters instead of importing global config
-
 logger = logging.getLogger(__name__)
 
 
 class GitHubClient:
-    """Client for interacting with GitHub API and Git operations."""
-
     def __init__(self, github_token: str, repo_owner: str, repo_name: str) -> None:
-        """Initialize the GitHub client."""
         self.github_token = github_token
         self.repo_owner = repo_owner
         self.repo_name = repo_name
@@ -26,7 +19,6 @@ class GitHubClient:
         self.repo = self.github.get_repo(f"{self.repo_owner}/{self.repo_name}")
 
     def get_issue(self, issue_number: int) -> Issue:
-        """Get an issue by number."""
         try:
             return self.repo.get_issue(issue_number)
         except Exception as e:
@@ -34,7 +26,6 @@ class GitHubClient:
             raise
 
     def get_pull_request(self, pr_number: int) -> PullRequest:
-        """Get a pull request by number."""
         try:
             return self.repo.get_pull(pr_number)
         except Exception as e:
@@ -68,27 +59,6 @@ class GitHubClient:
         except Exception as e:
             logger.error(f"Error creating pull request: {e}")
             raise
-
-    # def create_pull_request(
-    #     self,
-    #     title: str,
-    #     body: str,
-    #     head_branch: str,
-    #     base_branch: str = "main",
-    # ) -> PullRequest:
-    #     """Create a new pull request."""
-    #     try:
-    #         pr = self.repo.create_pull(
-    #             title=title,
-    #             body=body,
-    #             head=head_branch,
-    #             base=base_branch,
-    #         )
-    #         logger.info(f"Created pull request #{pr.number}: {title}")
-    #         return pr
-    #     except Exception as e:
-    #         logger.error(f"Error creating pull request: {e}")
-    #         raise
 
     def add_comment_to_pr(self, pr_number: int, comment: str) -> None:
         """Add a comment to a pull request."""
@@ -154,16 +124,8 @@ class GitHubClient:
             logger.error(f"Error creating branch {branch_name}: {e}")
             raise
 
-    def update_file(
-        self,
-        file_path: str,
-        content: str,
-        commit_message: str,
-        branch: str,
-    ) -> None:
-        """Update or create a file in the repository."""
+    def update_file(self, file_path: str, content: str, commit_message: str, branch: str) -> None:
         try:
-            # Try to get existing file
             try:
                 file = self.repo.get_contents(file_path, ref=branch)
                 # Update existing file
@@ -174,27 +136,20 @@ class GitHubClient:
                     sha=file.sha,
                     branch=branch,
                 )
-                logger.info(f"Updated file {file_path} in branch {branch}")
+                logger.info(f"Updated file {file_path} in {branch}")
             except Exception:
-                # Create new file
                 self.repo.create_file(
                     path=file_path,
                     message=commit_message,
                     content=content,
                     branch=branch,
                 )
-                logger.info(f"Created file {file_path} in branch {branch}")
+                logger.info(f"Created file {file_path} in {branch}")
         except Exception as e:
             logger.error(f"Error updating file {file_path}: {e}")
             raise
 
-    def delete_file(
-        self,
-        file_path: str,
-        commit_message: str,
-        branch: str,
-    ) -> None:
-        """Delete a file from the repository."""
+    def delete_file(self, file_path: str, commit_message: str, branch: str) -> None:
         try:
             file = self.repo.get_contents(file_path, ref=branch)
             self.repo.delete_file(
@@ -203,13 +158,12 @@ class GitHubClient:
                 sha=file.sha,
                 branch=branch,
             )
-            logger.info(f"Deleted file {file_path} from branch {branch}")
+            logger.info(f"Deleted file {file_path} from {branch}")
         except Exception as e:
             logger.error(f"Error deleting file {file_path}: {e}")
             raise
 
     def get_file_content(self, file_path: str, branch: str = "main") -> str:
-        """Get content of a file from the repository."""
         try:
             file = self.repo.get_contents(file_path, ref=branch)
             return file.decoded_content.decode("utf-8")
@@ -218,7 +172,6 @@ class GitHubClient:
             raise
 
     def list_repository_files(self, path: str = "", branch: str = "main") -> List[str]:
-        """List files in the repository."""
         try:
             contents = self.repo.get_contents(path, ref=branch)
             files = []

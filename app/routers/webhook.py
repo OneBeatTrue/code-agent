@@ -18,31 +18,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-
-def verify_webhook_signature(payload: bytes, signature: str, secret: str) -> bool:
-    """Verify GitHub webhook signature."""
-    if not signature.startswith("sha256="):
-        return False
-    
-    expected_signature = hmac.new(
-        secret.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
-    
-    received_signature = signature[7:]  # Remove 'sha256=' prefix
-    
-    return hmac.compare_digest(expected_signature, received_signature)
-
-
 @router.post("")
 async def handle_webhook(request: Request, background_tasks: BackgroundTasks):
     """Handle GitHub webhook events."""
     try:
-        # Log all headers for debugging
         logger.info(f"Webhook headers: {dict(request.headers)}")
         
-        # Get headers
         event_type = request.headers.get("X-GitHub-Event")
         signature = request.headers.get("X-Hub-Signature-256")
         delivery_id = request.headers.get("X-GitHub-Delivery")
@@ -51,19 +32,9 @@ async def handle_webhook(request: Request, background_tasks: BackgroundTasks):
             logger.error("Missing X-GitHub-Event header")
             raise HTTPException(status_code=400, detail="Missing X-GitHub-Event header")
         
-        # Signature verification disabled for testing
-        # if not signature:
-        #     logger.error("Missing X-Hub-Signature-256 header")
-        #     raise HTTPException(status_code=400, detail="Missing X-Hub-Signature-256 header")
-        
-        # Get payload
         payload = await request.body()
         logger.info(f"Webhook payload size: {len(payload)} bytes")
-        
-        # Skip signature verification for now
-        logger.info("Signature verification disabled for testing")
-        
-        # Parse payload
+
         try:
             data = json.loads(payload.decode())
         except json.JSONDecodeError as e:
@@ -73,7 +44,6 @@ async def handle_webhook(request: Request, background_tasks: BackgroundTasks):
         
         logger.info(f"Received webhook: {event_type} (delivery: {delivery_id})")
         
-        # Route to appropriate handler
         if event_type == "issues":
             background_tasks.add_task(handle_issues_event, data)
         elif event_type == "pull_request":
@@ -97,7 +67,6 @@ async def handle_webhook(request: Request, background_tasks: BackgroundTasks):
 
 
 async def handle_issues_event(data: Dict[str, Any]) -> None:
-    """Handle issues webhook events."""
     try:
         action = data.get("action")
         issue = data.get("issue", {})
@@ -118,7 +87,6 @@ async def handle_issues_event(data: Dict[str, Any]) -> None:
         
         logger.info(f"Starting SDLC cycle for issue {repo_full_name}#{issue_number}")
         
-        # Check if there's already a failed iteration for this issue
         from ..database import db_manager
         existing_iteration = db_manager.get_active_iteration(repo_full_name, issue_number)
         
@@ -126,8 +94,6 @@ async def handle_issues_event(data: Dict[str, Any]) -> None:
             logger.info(f"Active iteration exists for issue #{issue_number}, using existing")
             iteration = existing_iteration
         else:
-            # Check if there are any completed/failed iterations for this issue
-            # If so, restart instead of start
             with db_manager.get_session() as db:
                 from sqlalchemy import and_
                 from ..database import IssueIteration
@@ -164,7 +130,6 @@ async def handle_issues_event(data: Dict[str, Any]) -> None:
 
 
 async def handle_pull_request_event(data: Dict[str, Any]) -> None:
-    """Handle pull request webhook events."""
     try:
         action = data.get("action")
         pull_request = data.get("pull_request", {})
@@ -182,8 +147,7 @@ async def handle_pull_request_event(data: Dict[str, Any]) -> None:
         if not all([repo_full_name, pr_number, installation_id]):
             logger.error("Missing required fields in pull_request event")
             return
-        
-        # Check if this PR is managed by our system
+
         from ..database import db_manager
         iteration = db_manager.get_iteration_by_pr(repo_full_name, pr_number)
         
@@ -192,10 +156,8 @@ async def handle_pull_request_event(data: Dict[str, Any]) -> None:
             return
         
         logger.info(f"PR {repo_full_name}#{pr_number} updated, checking if review needed")
-        
-        # For synchronize events (new commits), we might want to wait for CI
+
         if action == "synchronize":
-            # Update iteration status to wait for CI
             db_manager.update_iteration(
                 iteration.id,
                 status="waiting_ci"
@@ -207,7 +169,6 @@ async def handle_pull_request_event(data: Dict[str, Any]) -> None:
 
 
 async def handle_workflow_run_event(data: Dict[str, Any]) -> None:
-    """Handle workflow run webhook events."""
     try:
         action = data.get("action")
         workflow_run = data.get("workflow_run", {})
@@ -230,13 +191,11 @@ async def handle_workflow_run_event(data: Dict[str, Any]) -> None:
         
         logger.info(f"Workflow completed for {repo_full_name}:{head_branch} - {status}/{conclusion}")
         
-        # Find associated PR
         pull_requests = workflow_run.get("pull_requests", [])
         if not pull_requests:
             logger.info("No pull requests associated with this workflow run")
             return
         
-        # Handle each associated PR
         for pr_info in pull_requests:
             pr_number = pr_info.get("number")
             if pr_number:
@@ -252,7 +211,6 @@ async def handle_workflow_run_event(data: Dict[str, Any]) -> None:
 
 
 async def handle_check_suite_event(data: Dict[str, Any]) -> None:
-    """Handle check suite webhook events."""
     try:
         action = data.get("action")
         check_suite = data.get("check_suite", {})
@@ -275,13 +233,11 @@ async def handle_check_suite_event(data: Dict[str, Any]) -> None:
         
         logger.info(f"Check suite completed for {repo_full_name}:{head_branch} - {status}/{conclusion}")
         
-        # Find associated PRs
         pull_requests = check_suite.get("pull_requests", [])
         if not pull_requests:
             logger.info("No pull requests associated with this check suite")
             return
         
-        # Handle each associated PR
         for pr_info in pull_requests:
             pr_number = pr_info.get("number")
             if pr_number:

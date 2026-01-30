@@ -1,5 +1,3 @@
-"""GitHub App authentication with JWT and installation tokens."""
-
 import time
 import logging
 from typing import Dict, Optional
@@ -15,26 +13,20 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubAppAuth:
-    """GitHub App authentication manager."""
-    
     def __init__(self):
         self.app_id = settings.github_app_id
         self._private_key: Optional[str] = None
-        self._installation_tokens: Dict[int, Dict] = {}  # Cache for installation tokens
+        self._installation_tokens: Dict[int, Dict] = {}
     
     @property
     def private_key(self) -> str:
-        """Lazy load private key."""
         if self._private_key is None:
             self._private_key = self._load_private_key()
         return self._private_key
     
     def _load_private_key(self) -> str:
-        """Load and validate private key."""
         try:
             private_key_content = settings.get_private_key()
-            
-            # Validate the private key by trying to load it
             serialization.load_pem_private_key(
                 private_key_content.encode(),
                 password=None
@@ -46,13 +38,12 @@ class GitHubAppAuth:
             raise ValueError(f"Invalid GitHub App private key: {e}")
     
     def generate_jwt(self) -> str:
-        """Generate JWT token for GitHub App authentication."""
         now = int(time.time())
         
         payload = {
-            "iat": now - 60,  # Issued at time (60 seconds ago to account for clock skew)
-            "exp": now + 600,  # Expires in 10 minutes
-            "iss": self.app_id  # Issuer (GitHub App ID)
+            "iat": now - 60,
+            "exp": now + 600,
+            "iss": self.app_id
         }
         
         try:
@@ -67,17 +58,13 @@ class GitHubAppAuth:
             raise ValueError(f"Failed to generate JWT: {e}")
     
     async def get_installation_token(self, installation_id: int) -> str:
-        """Get installation access token for a specific installation."""
-        # Check if we have a cached token that's still valid
         if installation_id in self._installation_tokens:
             token_data = self._installation_tokens[installation_id]
             expires_at = datetime.fromisoformat(token_data["expires_at"].replace("Z", "+00:00"))
             
-            # If token expires in more than 5 minutes, use cached token
             if expires_at > datetime.now().astimezone() + timedelta(minutes=5):
                 return token_data["token"]
         
-        # Generate new installation token
         jwt_token = self.generate_jwt()
         
         url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
@@ -94,7 +81,6 @@ class GitHubAppAuth:
                 
                 token_data = response.json()
                 
-                # Cache the token
                 self._installation_tokens[installation_id] = token_data
                 
                 logger.info(f"Generated new installation token for installation {installation_id}")
@@ -108,7 +94,6 @@ class GitHubAppAuth:
             raise ValueError(f"Error getting installation token: {e}")
     
     async def get_installation_id(self, owner: str, repo: str) -> Optional[int]:
-        """Get installation ID for a repository."""
         jwt_token = self.generate_jwt()
         
         url = f"https://api.github.com/repos/{owner}/{repo}/installation"
@@ -138,7 +123,6 @@ class GitHubAppAuth:
             return None
     
     async def get_authenticated_client(self, installation_id: int) -> httpx.AsyncClient:
-        """Get authenticated HTTP client for GitHub API."""
         token = await self.get_installation_token(installation_id)
         
         headers = {
@@ -150,7 +134,6 @@ class GitHubAppAuth:
         return httpx.AsyncClient(headers=headers)
     
     def clear_token_cache(self, installation_id: Optional[int] = None) -> None:
-        """Clear cached installation tokens."""
         if installation_id:
             self._installation_tokens.pop(installation_id, None)
         else:
@@ -158,5 +141,4 @@ class GitHubAppAuth:
         logger.info(f"Cleared token cache for installation {installation_id or 'all'}")
 
 
-# Global GitHub App auth instance
 github_app_auth = GitHubAppAuth()

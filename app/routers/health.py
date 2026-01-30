@@ -1,5 +1,3 @@
-"""Health check endpoints."""
-
 import logging
 from datetime import datetime
 
@@ -17,9 +15,8 @@ router = APIRouter()
 
 @router.get("/health")
 async def health_check():
-    """Health check endpoint."""
+    """Health check"""
     try:
-        # Test database connection
         with db_manager.get_session() as db:
             db.execute(text("SELECT 1"))
         
@@ -46,13 +43,11 @@ async def health_check():
 
 @router.get("/ready")
 async def readiness_check():
-    """Readiness check endpoint."""
+    """Readiness check"""
     try:
-        # Check database
         with db_manager.get_session() as db:
             db.execute(text("SELECT 1"))
         
-        # Check configuration
         required_config = [
             settings.github_app_id,
             settings.github_app_private_key,

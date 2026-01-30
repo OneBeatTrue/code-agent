@@ -3,8 +3,4 @@
 __version__ = "0.1.0"
 __author__ = "AI Code Agent by OBT"
 __email__ = "aiagent@example.com"
-
-# Note: Config is not imported here to avoid validation errors in FastAPI service
-# CodeAgent and ReviewerAgent are imported directly when needed with proper parameters
-
 __all__ = ["CodeAgent", "ReviewerAgent"]

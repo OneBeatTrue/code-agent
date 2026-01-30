@@ -1,5 +1,3 @@
-"""Orchestrator for managing iterative SDLC cycles."""
-
 import asyncio
 import logging
 from typing import Optional, Dict, Any
@@ -11,24 +9,18 @@ from .github_app.auth import github_app_auth
 from .config import settings
 from ai_code_agent.code_agent import CodeAgent
 from ai_code_agent.reviewer_agent import ReviewerAgent
-from ai_code_agent.llm_client import LLMClient
+from ai_code_agent.openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 
 
 class SDLCOrchestrator:
-    """Orchestrator for managing the full SDLC cycle."""
-    
     def __init__(self):
-        # Initialize LLM client with settings
-        self.llm_client = LLMClient(
+        self.llm_client = OpenAIClient(
             openai_api_key=settings.openai_api_key,
             openai_model=settings.openai_model,
             openai_base_url=settings.openai_base_url
         )
-        
-        # Note: GitHub client and agents will be created per-request with proper credentials
-        # since they need installation-specific tokens
     
     async def start_issue_cycle(
         self,
@@ -36,23 +28,19 @@ class SDLCOrchestrator:
         issue_number: int,
         installation_id: int
     ) -> Optional[IssueIteration]:
-        """Start a new SDLC cycle for an issue."""
         try:
             logger.info(f"Starting SDLC cycle for {repo_full_name}#{issue_number}")
             
-            # Check if there's already an active iteration for this issue
             existing_iteration = db_manager.get_active_iteration(repo_full_name, issue_number)
             if existing_iteration:
                 logger.info(f"Active iteration already exists for issue #{issue_number} (ID: {existing_iteration.id})")
                 return existing_iteration
             
-            # Get issue details
             owner, repo = repo_full_name.split("/")
             
             async with await get_github_client(installation_id) as github:
                 issue_data = await github.get_issue(owner, repo, issue_number)
             
-            # Create iteration record
             iteration = db_manager.create_iteration(
                 repo_full_name=repo_full_name,
                 issue_number=issue_number,
@@ -62,7 +50,6 @@ class SDLCOrchestrator:
                 max_iterations=settings.max_iterations
             )
             
-            # Start first iteration
             await self._run_code_iteration(iteration)
             
             return iteration
@@ -77,23 +64,19 @@ class SDLCOrchestrator:
         issue_number: int,
         installation_id: int
     ) -> Optional[IssueIteration]:
-        """Restart SDLC cycle for an issue (even if previous iterations failed)."""
         try:
             logger.info(f"Restarting SDLC cycle for {repo_full_name}#{issue_number}")
             
-            # Mark any existing active iterations as failed
             existing_iteration = db_manager.get_active_iteration(repo_full_name, issue_number)
             if existing_iteration:
                 logger.info(f"Marking existing iteration {existing_iteration.id} as failed to restart")
                 db_manager.complete_iteration(existing_iteration.id, IterationStatus.FAILED)
             
-            # Get issue details
             owner, repo = repo_full_name.split("/")
             
             async with await get_github_client(installation_id) as github:
                 issue_data = await github.get_issue(owner, repo, issue_number)
             
-            # Create new iteration record
             iteration = db_manager.create_iteration(
                 repo_full_name=repo_full_name,
                 issue_number=issue_number,
@@ -103,7 +86,6 @@ class SDLCOrchestrator:
                 max_iterations=settings.max_iterations
             )
             
-            # Start first iteration
             await self._run_code_iteration(iteration)
             
             return iteration
@@ -113,17 +95,14 @@ class SDLCOrchestrator:
             return None
     
     async def _run_code_iteration(self, iteration: IssueIteration) -> bool:
-        """Run a code generation iteration."""
         try:
             logger.info(f"Running code iteration {iteration.current_iteration + 1} for {iteration.repo_full_name}#{iteration.issue_number}")
             
-            # Increment iteration counter
             iteration = db_manager.increment_iteration(iteration.id)
             if not iteration:
                 logger.error("Failed to increment iteration")
                 return False
             
-            # Check if we've exceeded max iterations
             if iteration.current_iteration >= iteration.max_iterations:
                 await self._complete_iteration(iteration, IterationStatus.FAILED, 
                                              "Maximum iterations reached")
@@ -131,7 +110,6 @@ class SDLCOrchestrator:
             
             owner, repo = iteration.repo_full_name.split("/")
             
-            # Prepare context for code agent
             context = {
                 "repo_full_name": iteration.repo_full_name,
                 "issue_number": iteration.issue_number,
@@ -143,7 +121,6 @@ class SDLCOrchestrator:
                 "last_review_feedback": iteration.last_review_feedback
             }
             
-            # Run code agent
             async with await get_github_client(iteration.installation_id) as github:
                 result = await self._execute_code_agent(github, context)
             
@@ -152,7 +129,6 @@ class SDLCOrchestrator:
                                              "Code generation failed")
                 return False
             
-            # Update iteration with results
             db_manager.update_iteration(
                 iteration.id,
                 branch_name=result.get("branch_name"),
@@ -173,30 +149,24 @@ class SDLCOrchestrator:
         github, 
         context: Dict[str, Any]
     ) -> Optional[Dict[str, Any]]:
-        """Execute code agent with GitHub integration."""
         try:
             owner, repo = context["repo_full_name"].split("/")
             issue_number = context["issue_number"]
             
-            # Generate branch name if not exists
             branch_name = context.get("branch_name")
             if not branch_name:
                 branch_name = f"agent/issue-{issue_number}"
             
-            # Get default branch and its SHA
             default_branch = await github.get_default_branch(owner, repo)
             base_sha = await github.get_branch_sha(owner, repo, default_branch)
             
-            # Create or update branch
             try:
                 await github.create_branch(owner, repo, branch_name, base_sha)
                 logger.info(f"Created branch {branch_name}")
             except Exception as e:
-                # Check if it's a 422 error (branch already exists) or contains "already exists"
                 error_str = str(e).lower()
                 if "422" in error_str or "already exists" in error_str or "reference already exists" in error_str:
                     logger.info(f"Branch {branch_name} already exists, will update it")
-                    # Try to update the existing branch to point to the latest commit
                     try:
                         await github.update_branch(owner, repo, branch_name, base_sha)
                         logger.info(f"Updated branch {branch_name} to latest commit")
@@ -206,12 +176,10 @@ class SDLCOrchestrator:
                     logger.error(f"Failed to create branch: {e}")
                     return None
             
-            # Analyze issue and generate code changes
             analysis = await self._analyze_issue_requirements(context)
             if not analysis:
                 return None
             
-            # Apply code changes
             changes_applied = await self._apply_code_changes(
                 github, owner, repo, branch_name, analysis, context
             )
@@ -219,10 +187,8 @@ class SDLCOrchestrator:
             if not changes_applied:
                 return None
             
-            # Create or update PR
             pr_number = context.get("pr_number")
             if pr_number:
-                # Update existing PR
                 pr_title = f"Fix #{issue_number}: {context['issue_title']} (Iteration {context['iteration']})"
                 pr_body = self._generate_pr_description(context, analysis)
                 
@@ -231,7 +197,6 @@ class SDLCOrchestrator:
                 )
                 logger.info(f"Updated PR #{pr_number}")
             else:
-                # Create new PR
                 pr_title = f"Fix #{issue_number}: {context['issue_title']}"
                 pr_body = self._generate_pr_description(context, analysis)
                 
@@ -292,7 +257,6 @@ Iteration: {context['iteration']}"""
             
             response = await self.llm_client.generate_response(messages)
             
-            # Parse JSON response
             import json
             import re
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
@@ -315,12 +279,9 @@ Iteration: {context['iteration']}"""
         analysis: Dict,
         context: Dict[str, Any]
     ) -> bool:
-        """Apply code changes to the repository."""
         try:
-            # Get repository structure
             repo_files = await github.list_repository_files(owner, repo)
             
-            # Process files to modify
             for file_path in analysis.get("files_to_modify", []):
                 success = await self._modify_file(
                     github, owner, repo, branch_name, file_path, analysis, context
@@ -328,7 +289,6 @@ Iteration: {context['iteration']}"""
                 if not success:
                     logger.warning(f"Failed to modify {file_path}")
             
-            # Process files to create
             for file_path in analysis.get("files_to_create", []):
                 success = await self._create_file(
                     github, owner, repo, branch_name, file_path, analysis, context
@@ -352,9 +312,7 @@ Iteration: {context['iteration']}"""
         analysis: Dict,
         context: Dict[str, Any]
     ) -> bool:
-        """Modify an existing file."""
         try:
-            # Get current file content
             file_data = await github.get_file_content(owner, repo, file_path, branch_name)
             if not file_data:
                 logger.warning(f"File {file_path} not found, will create instead")
@@ -363,7 +321,6 @@ Iteration: {context['iteration']}"""
             import base64
             current_content = base64.b64decode(file_data["content"]).decode()
             
-            # Generate modified content using LLM
             modified_content = await self._generate_file_content(
                 file_path, current_content, analysis, context, is_modification=True
             )
@@ -371,7 +328,6 @@ Iteration: {context['iteration']}"""
             if not modified_content:
                 return False
             
-            # Update file
             commit_message = f"Modify {file_path} for issue #{context['issue_number']} (iteration {context['iteration']})"
             
             await github.create_or_update_file(
@@ -395,9 +351,7 @@ Iteration: {context['iteration']}"""
         analysis: Dict,
         context: Dict[str, Any]
     ) -> bool:
-        """Create a new file."""
         try:
-            # Generate file content using LLM
             file_content = await self._generate_file_content(
                 file_path, None, analysis, context, is_modification=False
             )
@@ -405,7 +359,6 @@ Iteration: {context['iteration']}"""
             if not file_content:
                 return False
             
-            # Create file
             commit_message = f"Create {file_path} for issue #{context['issue_number']} (iteration {context['iteration']})"
             
             await github.create_or_update_file(
@@ -427,7 +380,6 @@ Iteration: {context['iteration']}"""
         context: Dict[str, Any],
         is_modification: bool
     ) -> Optional[str]:
-        """Generate file content using LLM."""
         try:
             if is_modification:
                 system_prompt = f"""You are an expert software developer modifying code files.
@@ -548,27 +500,22 @@ Please provide the complete file content."""
         ci_status: str,
         ci_conclusion: str
     ) -> bool:
-        """Handle CI completion event."""
         try:
             logger.info(f"Handling CI completion for {repo_full_name} PR#{pr_number}: {ci_status}/{ci_conclusion}")
             
-            # Find iteration by PR
             iteration = db_manager.get_iteration_by_pr(repo_full_name, pr_number)
             if not iteration:
                 logger.warning(f"No active iteration found for PR #{pr_number}")
                 return False
             
-            # Check if already reviewing to prevent duplicate reviews
             if iteration.status == IterationStatus.REVIEWING:
                 logger.info(f"Review already in progress for iteration {iteration.id}, skipping")
                 return True
             
-            # Only proceed if waiting for CI
             if iteration.status != IterationStatus.WAITING_CI:
                 logger.info(f"Iteration {iteration.id} not waiting for CI (status: {iteration.status}), skipping")
                 return True
             
-            # Update CI status
             db_manager.update_iteration(
                 iteration.id,
                 last_ci_status=ci_status,
@@ -576,7 +523,6 @@ Please provide the complete file content."""
                 status=IterationStatus.REVIEWING
             )
             
-            # Start review process
             await self._run_review_iteration(iteration)
             
             return True
@@ -586,18 +532,15 @@ Please provide the complete file content."""
             return False
     
     async def _run_review_iteration(self, iteration: IssueIteration) -> bool:
-        """Run review iteration."""
         try:
             logger.info(f"Running review for {iteration.repo_full_name}#{iteration.issue_number}")
             
             owner, repo = iteration.repo_full_name.split("/")
             
             async with await get_github_client(iteration.installation_id) as github:
-                # Get PR details and files
                 pr_data = await github.get_pull_request(owner, repo, iteration.pr_number)
                 pr_files = await github.get_pull_request_files(owner, repo, iteration.pr_number)
                 
-                # Prepare review context
                 review_context = {
                     "repo_full_name": iteration.repo_full_name,
                     "issue_number": iteration.issue_number,
@@ -612,14 +555,12 @@ Please provide the complete file content."""
                     "installation_id": iteration.installation_id
                 }
                 
-                # Run review
                 review_result = await self._execute_reviewer_agent(review_context)
                 
                 if not review_result:
                     await self._complete_iteration(iteration, IterationStatus.FAILED, "Review failed")
                     return False
                 
-                # Update iteration with review results
                 db_manager.update_iteration(
                     iteration.id,
                     last_review_score=review_result.get("score"),
@@ -627,10 +568,8 @@ Please provide the complete file content."""
                     last_review_feedback=review_result.get("feedback")
                 )
                 
-                # Post review to PR
                 await self._post_review_results(github, review_context, review_result)
                 
-                # Decide next action
                 await self._decide_next_action(iteration, review_result)
                 
                 return True
@@ -641,30 +580,23 @@ Please provide the complete file content."""
             return False
     
     async def _execute_reviewer_agent(self, context: Dict[str, Any]) -> Optional[Dict]:
-        """Execute reviewer agent."""
         try:
-            # Create GitHub client for this installation
             async with await get_github_client(context.get("installation_id")) as github:
-                # Create GitHub client wrapper for old agent
                 from ai_code_agent.github_client import GitHubClient
                 
-                # Get installation token for this repo
                 owner, repo = context["repo_full_name"].split("/")
                 installation_token = await github_app_auth.get_installation_token(
                     context.get("installation_id")
                 )
                 
-                # Create old-style GitHub client
                 github_client = GitHubClient(
                     github_token=installation_token,
                     repo_owner=owner,
                     repo_name=repo
                 )
                 
-                # Create reviewer agent with dependencies
                 reviewer_agent = ReviewerAgent(github_client, self.llm_client)
                 
-                # Prepare review data similar to existing reviewer agent
                 pr_files_data = []
                 for file_info in context["pr_files"]:
                     pr_files_data.append({
@@ -676,16 +608,13 @@ Please provide the complete file content."""
                         "patch": file_info.get("patch", "")
                     })
                 
-                # Use existing reviewer agent logic
                 review_result = await reviewer_agent._perform_comprehensive_review(
                     context["pr_data"],
                     {"title": context["issue_title"], "body": context["issue_body"]},
                     pr_files_data
                 )
                 
-                # Add CI status consideration
                 if context["ci_conclusion"] != "success":
-                    # Penalize score for failing CI
                     if review_result.get("overall_assessment", {}).get("score", 0) > 50:
                         review_result["overall_assessment"]["score"] *= 0.8
                         review_result["overall_assessment"]["summary"] += f" CI failed with status: {context['ci_conclusion']}"
@@ -702,19 +631,15 @@ Please provide the complete file content."""
         context: Dict[str, Any], 
         review_result: Dict
     ) -> None:
-        """Post review results to PR."""
         try:
             owner, repo = context["repo_full_name"].split("/")
             
-            # Generate review comment
             comment = self._format_review_comment(review_result, context)
             
-            # Post comment
             await github.create_issue_comment(
                 owner, repo, context["pr_number"], comment
             )
             
-            # Determine review event
             recommendation = review_result.get("overall_assessment", {}).get("recommendation", "")
             if recommendation == "approve" and context["ci_conclusion"] == "success":
                 event = "APPROVE"
@@ -723,7 +648,6 @@ Please provide the complete file content."""
             else:
                 event = "COMMENT"
             
-            # Create review
             review_summary = review_result.get("overall_assessment", {}).get("summary", "")
             await github.create_pull_request_review(
                 owner, repo, context["pr_number"], review_summary, event
@@ -735,10 +659,9 @@ Please provide the complete file content."""
             logger.error(f"Failed to post review results: {e}", exc_info=True)
     
     def _format_review_comment(self, review_result: Dict, context: Dict[str, Any]) -> str:
-        """Format review comment."""
         overall = review_result.get("overall_assessment", {})
         
-        comment = f"""## 🤖 AI Code Review - Iteration {context['iteration']}
+        comment = f"""## AI Code Review - Iteration {context['iteration']}
 
 ### {overall.get('status', 'Review Completed')}
 
@@ -746,12 +669,12 @@ Please provide the complete file content."""
 
 **CI Status:** {context['ci_conclusion']} ({'✅' if context['ci_conclusion'] == 'success' else '❌'})
 
-### 📊 Analysis:
+### Analysis:
 - **Code Quality:** {review_result.get('code_quality', {}).get('summary', 'N/A')}
 - **Requirements Compliance:** {review_result.get('requirements_compliance', {}).get('summary', 'N/A')}
 - **Security & Best Practices:** {review_result.get('security_analysis', {}).get('summary', 'N/A')}
 
-### 💡 Recommendation: **{overall.get('recommendation', 'unknown').upper()}**
+### Recommendation: **{overall.get('recommendation', 'unknown').upper()}**
 
 {overall.get('summary', 'No summary available')}
 
@@ -765,13 +688,11 @@ Please provide the complete file content."""
         iteration: IssueIteration, 
         review_result: Dict
     ) -> None:
-        """Decide what to do next based on review results."""
         try:
             overall = review_result.get("overall_assessment", {})
             recommendation = overall.get("recommendation", "")
             ci_success = iteration.last_ci_conclusion == "success"
             
-            # Complete if approved and CI is green
             if recommendation in ["approve", "approve_with_suggestions"] and ci_success:
                 await self._complete_iteration(
                     iteration, 
@@ -780,21 +701,17 @@ Please provide the complete file content."""
                 )
                 return
             
-            # Continue iteration if changes requested and under limit
             if (recommendation == "request_changes" and 
                 iteration.current_iteration < iteration.max_iterations):
                 
-                # Update status to trigger next iteration
                 db_manager.update_iteration(
                     iteration.id,
                     status=IterationStatus.RUNNING
                 )
                 
-                # Schedule next iteration
                 asyncio.create_task(self._run_code_iteration(iteration))
                 return
             
-            # Fail if max iterations reached or other issues
             await self._complete_iteration(
                 iteration,
                 IterationStatus.FAILED,
@@ -811,17 +728,15 @@ Please provide the complete file content."""
         status: IterationStatus,
         message: str
     ) -> None:
-        """Complete iteration with final status."""
         try:
             db_manager.complete_iteration(iteration.id, status)
             
-            # Post final comment to PR if exists
             if iteration.pr_number:
                 async with await get_github_client(iteration.installation_id) as github:
                     owner, repo = iteration.repo_full_name.split("/")
                     
                     if status == IterationStatus.COMPLETED:
-                        final_comment = f"""## ✅ SDLC Cycle Completed Successfully!
+                        final_comment = f"""## SDLC Cycle Completed Successfully!
 
 The automated development cycle has been completed successfully after {iteration.current_iteration} iteration(s).
 
@@ -829,7 +744,7 @@ The automated development cycle has been completed successfully after {iteration
 
 This PR is ready for human review and merge."""
                     else:
-                        final_comment = f"""## ❌ SDLC Cycle Failed
+                        final_comment = f"""## SDLC Cycle Failed
 
 The automated development cycle could not be completed successfully.
 
@@ -848,5 +763,4 @@ Manual intervention may be required to resolve the remaining issues."""
             logger.error(f"Failed to complete iteration: {e}", exc_info=True)
 
 
-# Global orchestrator instance
 orchestrator = SDLCOrchestrator()

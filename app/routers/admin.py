@@ -57,16 +57,14 @@ async def start_issue_manually(
     """Manually start SDLC cycle for an issue."""
     try:
         repo_full_name = f"{owner}/{repo}"
-        
-        # Get installation ID
+
         installation_id = await github_app_auth.get_installation_id(owner, repo)
         if not installation_id:
             raise HTTPException(
                 status_code=404,
                 detail=f"GitHub App not installed on {repo_full_name}"
             )
-        
-        # Check if there's already an active iteration
+
         existing = db_manager.get_active_iteration(repo_full_name, issue_number)
         if existing:
             raise HTTPException(
@@ -76,7 +74,6 @@ async def start_issue_manually(
         
         logger.info(f"Manually starting SDLC cycle for {repo_full_name}#{issue_number}")
         
-        # Start SDLC cycle in background
         background_tasks.add_task(
             _start_issue_background,
             repo_full_name,
@@ -113,8 +110,7 @@ async def restart_issue_manually(
     """Restart SDLC cycle for an issue (even if previous iterations failed)."""
     try:
         repo_full_name = f"{owner}/{repo}"
-        
-        # Get installation ID
+
         installation_id = await github_app_auth.get_installation_id(owner, repo)
         if not installation_id:
             raise HTTPException(
@@ -123,8 +119,7 @@ async def restart_issue_manually(
             )
         
         logger.info(f"Manually restarting SDLC cycle for {repo_full_name}#{issue_number}")
-        
-        # Restart SDLC cycle in background
+
         background_tasks.add_task(
             _restart_issue_background,
             repo_full_name,
@@ -156,9 +151,7 @@ async def _restart_issue_background(
     installation_id: int,
     max_iterations: Optional[int]
 ):
-    """Background task to restart issue processing."""
     try:
-        # Use the restart method from orchestrator
         await orchestrator.restart_issue_cycle(
             repo_full_name=repo_full_name,
             issue_number=issue_number,
@@ -174,11 +167,8 @@ async def _start_issue_background(
     installation_id: int,
     max_iterations: Optional[int]
 ):
-    """Background task to start issue processing."""
     try:
-        # Create iteration with custom max_iterations if provided
         if max_iterations:
-            # We need to create the iteration manually to set custom max_iterations
             from ..github_client import get_github_client
             
             owner, repo = repo_full_name.split("/")
@@ -194,10 +184,8 @@ async def _start_issue_background(
                 max_iterations=max_iterations
             )
             
-            # Start the cycle manually
             await orchestrator._run_code_iteration(iteration)
         else:
-            # Use default flow
             await orchestrator.start_issue_cycle(
                 repo_full_name=repo_full_name,
                 issue_number=issue_number,
@@ -219,7 +207,6 @@ async def review_pr_manually(
     try:
         repo_full_name = f"{owner}/{repo}"
         
-        # Find iteration by PR
         iteration = db_manager.get_iteration_by_pr(repo_full_name, pr_number)
         if not iteration and not request.force:
             raise HTTPException(
@@ -228,7 +215,6 @@ async def review_pr_manually(
             )
         
         if not iteration and request.force:
-            # Get installation ID for forced review
             installation_id = await github_app_auth.get_installation_id(owner, repo)
             if not installation_id:
                 raise HTTPException(
@@ -236,22 +222,19 @@ async def review_pr_manually(
                     detail=f"GitHub App not installed on {repo_full_name}"
                 )
             
-            # Create a temporary iteration for forced review
             iteration = db_manager.create_iteration(
                 repo_full_name=repo_full_name,
-                issue_number=0,  # Dummy issue number for forced review
+                issue_number=0,
                 installation_id=installation_id,
                 issue_title="Manual PR Review",
                 issue_body="Manually triggered PR review",
                 max_iterations=1
             )
             
-            # Update with PR number
             db_manager.update_iteration(iteration.id, pr_number=pr_number)
         
         logger.info(f"Manually triggering review for {repo_full_name} PR#{pr_number}")
         
-        # Trigger review in background
         background_tasks.add_task(_review_pr_background, iteration)
         
         return JSONResponse(
@@ -273,9 +256,7 @@ async def review_pr_manually(
 
 
 async def _review_pr_background(iteration: IssueIteration):
-    """Background task to review PR."""
     try:
-        # Update status and trigger review
         db_manager.update_iteration(
             iteration.id,
             status=IterationStatus.REVIEWING,
@@ -329,7 +310,7 @@ async def get_issue_status(owner: str, repo: str, issue_number: int):
 
 @router.get("/iterations")
 async def list_active_iterations():
-    """List all active iterations."""
+    """List of all active iterations."""
     try:
         iterations = db_manager.get_all_active_iterations()
         
@@ -399,7 +380,6 @@ async def get_system_stats():
     """Get system statistics."""
     try:
         with db_manager.get_session() as db:
-            # Count iterations by status
             from sqlalchemy import func
             
             stats = db.query(
@@ -409,10 +389,8 @@ async def get_system_stats():
             
             status_counts = {status: count for status, count in stats}
             
-            # Get total iterations
             total_iterations = db.query(func.count(IssueIteration.id)).scalar()
             
-            # Get active iterations
             active_iterations = db.query(func.count(IssueIteration.id)).filter(
                 IssueIteration.is_active == True
             ).scalar()

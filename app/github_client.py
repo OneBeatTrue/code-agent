@@ -1,5 +1,3 @@
-"""GitHub API client for GitHub App integration."""
-
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -13,24 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubAppClient:
-    """GitHub API client using GitHub App authentication."""
-    
     def __init__(self, installation_id: int):
         self.installation_id = installation_id
         self._client: Optional[httpx.AsyncClient] = None
     
     async def __aenter__(self):
-        """Async context manager entry."""
         self._client = await github_app_auth.get_authenticated_client(self.installation_id)
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
         if self._client:
             await self._client.aclose()
     
     async def get_issue(self, owner: str, repo: str, issue_number: int) -> Dict[str, Any]:
-        """Get issue details."""
         url = f"https://api.github.com/repos/{owner}/{repo}/issues/{issue_number}"
         
         response = await self._client.get(url)
@@ -38,7 +31,6 @@ class GitHubAppClient:
         return response.json()
     
     async def get_pull_request(self, owner: str, repo: str, pr_number: int) -> Dict[str, Any]:
-        """Get pull request details."""
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
         
         response = await self._client.get(url)
@@ -46,7 +38,6 @@ class GitHubAppClient:
         return response.json()
     
     async def create_branch(self, owner: str, repo: str, branch_name: str, base_sha: str) -> Dict[str, Any]:
-        """Create a new branch."""
         url = f"https://api.github.com/repos/{owner}/{repo}/git/refs"
         
         data = {
@@ -59,12 +50,11 @@ class GitHubAppClient:
         return response.json()
     
     async def update_branch(self, owner: str, repo: str, branch_name: str, new_sha: str) -> Dict[str, Any]:
-        """Update an existing branch to point to a new commit."""
         url = f"https://api.github.com/repos/{owner}/{repo}/git/refs/heads/{branch_name}"
         
         data = {
             "sha": new_sha,
-            "force": True  # Force update even if it's not a fast-forward
+            "force": True
         }
         
         response = await self._client.patch(url, json=data)
@@ -72,7 +62,6 @@ class GitHubAppClient:
         return response.json()
     
     async def get_default_branch(self, owner: str, repo: str) -> str:
-        """Get repository default branch."""
         url = f"https://api.github.com/repos/{owner}/{repo}"
         
         response = await self._client.get(url)
@@ -81,7 +70,6 @@ class GitHubAppClient:
         return repo_data["default_branch"]
     
     async def get_branch_sha(self, owner: str, repo: str, branch: str) -> str:
-        """Get SHA of a branch."""
         url = f"https://api.github.com/repos/{owner}/{repo}/git/refs/heads/{branch}"
         
         response = await self._client.get(url)
@@ -99,12 +87,10 @@ class GitHubAppClient:
         branch: str,
         sha: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Create or update a file in the repository."""
         import base64
         
         url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
         
-        # Encode content to base64
         encoded_content = base64.b64encode(content.encode()).decode()
         
         data = {
@@ -127,7 +113,6 @@ class GitHubAppClient:
         path: str,
         branch: str = None
     ) -> Optional[Dict[str, Any]]:
-        """Get file content from repository."""
         url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
         
         params = {}
@@ -152,7 +137,6 @@ class GitHubAppClient:
         head: str,
         base: str
     ) -> Dict[str, Any]:
-        """Create a pull request."""
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         
         data = {
@@ -174,7 +158,6 @@ class GitHubAppClient:
         title: Optional[str] = None,
         body: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Update a pull request."""
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}"
         
         data = {}

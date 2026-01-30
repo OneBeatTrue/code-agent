@@ -1,6 +1,6 @@
 # AI Code Agent
 
-Автоматизированный агент для разработки кода через GitHub Issues с использованием AI.
+Автоматизированный агент для разработки кода через GitHub App.
 
 ## Возможности
 
@@ -28,32 +28,14 @@
    - Запустите обработку: `POST /admin/run/issue/{owner}/{repo}/{issue_number}`
    - Система автоматически создаст PR с решением
 
-## Конфигурация
-
-Основные переменные в `.env`:
+## Конфигурация в `.env` (обязательная)
 
 ```bash
-# GitHub App
 GITHUB_APP_ID=your_app_id
 GITHUB_APP_PRIVATE_KEY=path/to/private.pem
 
-# LLM (выберите один)
 OPENAI_API_KEY=your_openai_key
+OPENAI_BASE_URL=your_openai_provider_url
+OPENAI_BASE_URL=your_openai_provider_url
 
-# Настройки
-MAX_ITERATIONS=5
-```
-
-## API
-
-- `GET /health` - Проверка состояния
-- `POST /admin/run/issue/{owner}/{repo}/{issue_number}` - Запуск обработки issue
-- `POST /admin/run/review/{owner}/{repo}/{pr_number}` - Ручной запуск ревью
-- `GET /admin/iterations` - Список активных итераций
-- `GET /docs` - Swagger документация
-
-## Архитектура
-
-```
-GitHub Issue → Анализ → Генерация кода → PR → CI → ИИ-ревью → Итерация/Завершение
 ```

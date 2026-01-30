@@ -1,5 +1,3 @@
-"""Tests for configuration module."""
-
 import os
 import pytest
 from unittest.mock import patch
@@ -8,10 +6,7 @@ from ai_code_agent.config import Config
 
 
 class TestConfig:
-    """Test configuration management."""
-
     def test_config_initialization_with_env_vars(self):
-        """Test config initialization with environment variables."""
         with patch.dict(os.environ, {
             'GITHUB_TOKEN': 'test_token',
             'GITHUB_REPO_OWNER': 'test_owner',
@@ -25,7 +20,6 @@ class TestConfig:
             assert config.openai_api_key == 'test_openai_key'
 
     def test_config_defaults(self):
-        """Test default configuration values."""
         with patch.dict(os.environ, {
             'GITHUB_TOKEN': 'test_token',
             'GITHUB_REPO_OWNER': 'test_owner',
@@ -39,7 +33,6 @@ class TestConfig:
             assert config.log_level == 'INFO'
 
     def test_github_repo_url_property(self):
-        """Test GitHub repository URL property."""
         with patch.dict(os.environ, {
             'GITHUB_TOKEN': 'test_token',
             'GITHUB_REPO_OWNER': 'testowner',
@@ -51,7 +44,6 @@ class TestConfig:
             assert config.github_repo_url == expected_url
 
     def test_missing_required_env_vars(self):
-        """Test behavior with missing required environment variables."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(Exception):  # Should raise validation error
+            with pytest.raises(Exception): 
                 Config()

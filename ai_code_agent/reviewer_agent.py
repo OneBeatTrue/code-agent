@@ -7,28 +7,22 @@ import re
 from typing import Dict, List, Optional, Tuple
 
 from .github_client import GitHubClient
-from .llm_client import LLMClient
+from .openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 
 
 class ReviewerAgent:
-    """Agent responsible for reviewing pull requests and providing feedback."""
-
-    def __init__(self, github_client: GitHubClient, llm_client: LLMClient) -> None:
-        """Initialize the Reviewer Agent."""
+    def __init__(self, github_client: GitHubClient, llm_client: OpenAIClient) -> None:
         self.github_client = github_client
         self.llm_client = llm_client
 
     async def review_pull_request(self, pr_number: int) -> Dict[str, any]:
-        """Review a pull request and provide comprehensive feedback."""
         try:
             logger.info(f"Starting review of pull request #{pr_number}")
             
-            # Get PR details
             pr = self.github_client.get_pull_request(pr_number)
             
-            # Get related issue if exists
             issue_number = self._extract_issue_number(pr.title, pr.body or "")
             issue = None
             if issue_number:
@@ -37,15 +31,12 @@ class ReviewerAgent:
                 except Exception as e:
                     logger.warning(f"Could not fetch issue #{issue_number}: {e}")
 
-            # Get PR files and changes
             pr_files = self.github_client.get_pr_files(pr_number)
             
-            # Perform comprehensive review
             review_result = await self._perform_comprehensive_review(
                 pr, issue, pr_files
             )
             
-            # Post review results
             await self._post_review_results(pr_number, review_result)
             
             logger.info(f"Completed review of pull request #{pr_number}")
@@ -58,20 +49,15 @@ class ReviewerAgent:
     async def _perform_comprehensive_review(
         self, pr, issue, pr_files: List[Dict]
     ) -> Dict[str, any]:
-        """Perform a comprehensive review of the pull request."""
         try:
-            # Analyze code quality
             code_quality_result = await self._analyze_code_quality(pr_files)
             
-            # Check requirements compliance
             requirements_result = await self._check_requirements_compliance(
                 pr, issue, pr_files
             )
             
-            # Analyze security and best practices
             security_result = await self._analyze_security_and_practices(pr_files)
             
-            # Generate overall assessment
             overall_assessment = await self._generate_overall_assessment(
                 code_quality_result,
                 requirements_result,

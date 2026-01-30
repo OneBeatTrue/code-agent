@@ -1,5 +1,3 @@
-"""Code Agent for analyzing issues and generating code changes."""
-
 import asyncio
 import logging
 import re
@@ -7,37 +5,29 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from .github_client import GitHubClient
-from .llm_client import LLMClient
+from .openai_client import OpenAIClient
 
 logger = logging.getLogger(__name__)
 
 
 class CodeAgent:
-    """Agent responsible for analyzing issues and generating code changes."""
-
-    def __init__(self, github_client: GitHubClient, llm_client: LLMClient) -> None:
-        """Initialize the Code Agent."""
+    def __init__(self, github_client: GitHubClient, llm_client: OpenAIClient) -> None:
         self.github_client = github_client
         self.llm_client = llm_client
 
     async def process_issue(self, issue_number: int) -> Optional[int]:
-        """Process an issue and create a pull request with the solution."""
         try:
-            # Get issue details
             issue = self.github_client.get_issue(issue_number)
             logger.info(f"Processing issue #{issue_number}: {issue.title}")
 
-            # Analyze the issue requirements
             analysis = await self._analyze_issue(issue.title, issue.body or "")
             if not analysis:
                 logger.error("Failed to analyze issue requirements")
                 return None
 
-            # Create a new branch for the changes
             branch_name = f"feature/issue-{issue_number}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
             self.github_client.create_branch(branch_name)
 
-            # Generate and apply code changes
             changes_applied = await self._generate_and_apply_changes(
                 analysis, branch_name, issue_number
             )
@@ -46,7 +36,6 @@ class CodeAgent:
                 logger.error("Failed to apply code changes")
                 return None
 
-            # Create pull request
             pr_title = f"Fix #{issue_number}: {issue.title}"
             pr_body = self._generate_pr_description(issue, analysis)
             
@@ -100,8 +89,7 @@ Please analyze this issue and provide the structured response."""
             ]
             
             response = await self.llm_client.generate_response(messages)
-            
-            # Extract JSON from response
+
             import json
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
@@ -117,15 +105,11 @@ Please analyze this issue and provide the structured response."""
     async def _generate_and_apply_changes(
         self, analysis: Dict, branch_name: str, issue_number: int
     ) -> bool:
-        """Generate code changes based on analysis and apply them to the branch."""
         try:
-            # Get current repository structure
             repo_files = self.github_client.list_repository_files()
-            
-            # Generate changes for each file
+
             all_changes_applied = True
-            
-            # Handle files to modify
+
             for file_path in analysis.get("files_to_modify", []):
                 if file_path in repo_files:
                     success = await self._modify_existing_file(
@@ -136,7 +120,6 @@ Please analyze this issue and provide the structured response."""
                 else:
                     logger.warning(f"File {file_path} not found in repository")
 
-            # Handle files to create
             for file_path in analysis.get("files_to_create", []):
                 success = await self._create_new_file(
                     file_path, analysis, branch_name, issue_number
@@ -153,12 +136,9 @@ Please analyze this issue and provide the structured response."""
     async def _modify_existing_file(
         self, file_path: str, analysis: Dict, branch_name: str, issue_number: int
     ) -> bool:
-        """Modify an existing file based on the analysis."""
         try:
-            # Get current file content
             current_content = self.github_client.get_file_content(file_path, "main")
-            
-            # Generate modified content
+
             system_prompt = f"""You are an expert software developer modifying code files.
             
             Based on the issue analysis, modify the existing file to implement the required functionality.
@@ -192,12 +172,10 @@ Please provide the modified file content that implements the required functional
             ]
             
             modified_content = await self.llm_client.generate_response(messages)
-            
-            # Clean up the response (remove code block markers if present)
+
             modified_content = re.sub(r'^```[a-zA-Z]*\n', '', modified_content)
             modified_content = re.sub(r'\n```$', '', modified_content)
-            
-            # Apply the changes
+
             commit_message = f"Modify {file_path} for issue #{issue_number}"
             self.github_client.update_file(
                 file_path, modified_content, commit_message, branch_name
@@ -213,7 +191,6 @@ Please provide the modified file content that implements the required functional
     async def _create_new_file(
         self, file_path: str, analysis: Dict, branch_name: str, issue_number: int
     ) -> bool:
-        """Create a new file based on the analysis."""
         try:
             system_prompt = f"""You are an expert software developer creating new code files.
             
@@ -245,12 +222,10 @@ Please provide the complete file content that implements the required functional
             ]
             
             file_content = await self.llm_client.generate_response(messages)
-            
-            # Clean up the response (remove code block markers if present)
+
             file_content = re.sub(r'^```[a-zA-Z]*\n', '', file_content)
             file_content = re.sub(r'\n```$', '', file_content)
-            
-            # Create the file
+
             commit_message = f"Create {file_path} for issue #{issue_number}"
             self.github_client.update_file(
                 file_path, file_content, commit_message, branch_name
@@ -264,7 +239,6 @@ Please provide the complete file content that implements the required functional
             return False
 
     def _generate_pr_description(self, issue, analysis: Dict) -> str:
-        """Generate a comprehensive pull request description."""
         description = f"""## Fixes #{issue.number}
 
 **Issue Title:** {issue.title}
@@ -293,9 +267,9 @@ Please provide the complete file content that implements the required functional
             description += f"\n**Technical Approach:**\n{analysis['technical_approach']}\n"
 
         description += "\n### Testing\n"
-        description += "- [ ] Code follows project standards\n"
-        description += "- [ ] All tests pass\n"
-        description += "- [ ] No linting errors\n"
-        description += "- [ ] Functionality works as expected\n"
+        description += "- Code follows project standards\n"
+        description += "- All tests pass\n"
+        description += "- No linting errors\n"
+        description += "- Functionality works as expected\n"
 
         return description

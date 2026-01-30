@@ -1,5 +1,3 @@
-"""Command Line Interface for AI Code Agent."""
-
 import asyncio
 import logging
 import sys
@@ -12,10 +10,10 @@ from .code_agent import CodeAgent
 from .config import config
 from .reviewer_agent import ReviewerAgent
 
-# Load environment variables
+
 load_dotenv()
 
-# Configure logging
+
 logging.basicConfig(
     level=getattr(logging, config.log_level.upper()),
     format=config.log_format,   
@@ -44,31 +42,29 @@ def main() -> None:
     help="Maximum number of iterations for fixing issues"
 )
 def process_issue(issue_number: int, max_iterations: Optional[int]) -> None:
-    """Process a GitHub issue and create a pull request with the solution.
+    """Process a GitHub issue and create a pull request.
     
     ISSUE_NUMBER: The GitHub issue number to process
     """
     click.echo(f"🚀 Processing issue #{issue_number}...")
     
     try:
-        # Override max iterations if provided
         if max_iterations:
             config.max_iterations = max_iterations
-            
-        # Initialize and run code agent
+
         code_agent = CodeAgent()
         pr_number = asyncio.run(code_agent.process_issue(issue_number))
         
         if pr_number:
-            click.echo(f"✅ Successfully created pull request #{pr_number}")
-            click.echo(f"🔗 View at: {config.github_repo_url}/pull/{pr_number}")
+            click.echo(f"Successfully created pull request #{pr_number}")
+            click.echo(f"View at: {config.github_repo_url}/pull/{pr_number}")
         else:
-            click.echo("❌ Failed to process issue")
+            click.echo("Failed to process issue")
             sys.exit(1)
             
     except Exception as e:
         logger.error(f"Error processing issue: {e}")
-        click.echo(f"❌ Error: {e}")
+        click.echo(f"Error: {e}")
         sys.exit(1)
 
 
@@ -82,23 +78,21 @@ def review_pr(pr_number: int) -> None:
     click.echo(f"🔍 Reviewing pull request #{pr_number}...")
     
     try:
-        # Initialize and run reviewer agent
         reviewer_agent = ReviewerAgent()
         result = asyncio.run(reviewer_agent.review_pull_request(pr_number))
         
         if result.get("status") == "completed":
             overall = result.get("overall_assessment", {})
-            click.echo(f"✅ Review completed!")
-            click.echo(f"📊 Score: {overall.get('score', 0)}/100")
-            click.echo(f"💡 Recommendation: {overall.get('recommendation', 'unknown')}")
-            click.echo(f"🔗 View at: {config.github_repo_url}/pull/{pr_number}")
+            click.echo(f"Review succeded")
+            click.echo(f"Score: {overall.get('score', 0)}/100")
+            click.echo(f"Recommendation: {overall.get('recommendation', 'unknown')}")
         else:
-            click.echo(f"❌ Review failed: {result.get('message', 'Unknown error')}")
+            click.echo(f"Review failed: {result.get('message', 'Unknown error')}")
             sys.exit(1)
             
     except Exception as e:
         logger.error(f"Error reviewing PR: {e}")
-        click.echo(f"❌ Error: {e}")
+        click.echo(f"Error: {e}")
         sys.exit(1)
 
 
@@ -126,78 +120,73 @@ def full_cycle(issue_number: int, max_iterations: Optional[int]) -> None:
         
         while iteration < max_iter:
             iteration += 1
-            click.echo(f"\n📍 Iteration {iteration}/{max_iter}")
-            
-            # Step 1: Process issue and create/update PR
+            click.echo(f"\nIteration {iteration}/{max_iter}")
+
             click.echo("🚀 Processing issue...")
             pr_number = asyncio.run(code_agent.process_issue(issue_number))
             
             if not pr_number:
-                click.echo("❌ Failed to create pull request")
+                click.echo("Failed to create pull request")
                 sys.exit(1)
                 
-            click.echo(f"✅ Pull request #{pr_number} created/updated")
-            
-            # Step 2: Review the PR
+            click.echo(f"Pull request #{pr_number} created/updated")
+
             click.echo("🔍 Reviewing pull request...")
             review_result = asyncio.run(reviewer_agent.review_pull_request(pr_number))
             
             if review_result.get("status") != "completed":
-                click.echo(f"❌ Review failed: {review_result.get('message')}")
+                click.echo(f"Review failed: {review_result.get('message')}")
                 sys.exit(1)
             
             overall = review_result.get("overall_assessment", {})
             score = overall.get("score", 0)
             recommendation = overall.get("recommendation", "unknown")
             
-            click.echo(f"📊 Review Score: {score}/100")
-            click.echo(f"💡 Recommendation: {recommendation}")
-            
-            # Step 3: Check if we should continue
+            click.echo(f"Review Score: {score}/100")
+            click.echo(f"Recommendation: {recommendation}")
+
             if recommendation in ["approve", "approve_with_suggestions"]:
                 click.echo("🎉 Pull request approved! SDLC cycle completed successfully.")
                 click.echo(f"🔗 Final PR: {config.github_repo_url}/pull/{pr_number}")
                 break
             elif recommendation == "request_changes":
                 if iteration < max_iter:
-                    click.echo("🔄 Changes requested. Starting next iteration...")
+                    click.echo("Changes requested. Starting next iteration...")
                     continue
                 else:
-                    click.echo("⚠️ Maximum iterations reached. Manual intervention may be needed.")
+                    click.echo("Maximum iterations reached. Manual intervention may be needed.")
                     break
             else:
-                click.echo("❌ Significant issues found. Manual intervention required.")
+                click.echo("Significant issues found. Manual intervention required.")
                 break
         
         if iteration >= max_iter:
-            click.echo(f"⚠️ Reached maximum iterations ({max_iter}). Process stopped.")
+            click.echo(f"Reached maximum iterations ({max_iter}). Process stopped.")
             
     except Exception as e:
         logger.error(f"Error in full cycle: {e}")
-        click.echo(f"❌ Error: {e}")
+        click.echo(f"Error: {e}")
         sys.exit(1)
 
 
 @main.command()
 def config_info() -> None:
     """Display current configuration information."""
-    click.echo("🔧 AI Code Agent Configuration:")
-    click.echo(f"📁 Repository: {config.github_repo_owner}/{config.github_repo_name}")
-    click.echo(f"🤖 LLM Model: {config.openai_model}")
-    click.echo(f"🔄 Max Iterations: {config.max_iterations}")
-    click.echo(f"📝 Log Level: {config.log_level}")
-    click.echo("🤖 Using OpenAI GPT")
+    click.echo("AI Code Agent Configuration:")
+    click.echo(f"Repository: {config.github_repo_owner}/{config.github_repo_name}")
+    click.echo(f"LLM Model: {config.openai_model}")
+    click.echo(f"Max Iterations: {config.max_iterations}")
+    click.echo(f"Log Level: {config.log_level}")
 
 
 @main.command()
 def validate_config() -> None:
     """Validate the current configuration."""
-    click.echo("🔍 Validating configuration...")
+    click.echo("Validating configuration...")
     
     errors = []
     warnings = []
     
-    # Check required environment variables
     if not config.github_token:
         errors.append("GITHUB_TOKEN is not set")
     
@@ -209,28 +198,26 @@ def validate_config() -> None:
     
     if not config.openai_api_key:
         errors.append("OPENAI_API_KEY is not set")
-    
-    # Check configuration values
+
     if config.max_iterations < 1 or config.max_iterations > 10:
         warnings.append(f"MAX_ITERATIONS ({config.max_iterations}) should be between 1 and 10")
     
-    # Display results
     if errors:
-        click.echo("❌ Configuration errors found:")
+        click.echo("Configuration errors found:")
         for error in errors:
             click.echo(f"  • {error}")
     
     if warnings:
-        click.echo("⚠️ Configuration warnings:")
+        click.echo("Configuration warnings:")
         for warning in warnings:
             click.echo(f"  • {warning}")
     
     if not errors and not warnings:
-        click.echo("✅ Configuration is valid!")
+        click.echo("Configuration is valid!")
     elif not errors:
-        click.echo("✅ Configuration is valid (with warnings)")
+        click.echo("Configuration is valid (with warnings)")
     else:
-        click.echo("❌ Configuration has errors that need to be fixed")
+        click.echo("Configuration has errors that need to be fixed")
         sys.exit(1)
 
 
