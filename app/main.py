@@ -30,14 +30,14 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager."""
     # Startup
-    logger.info("Starting AI Coding Agent GitHub App...")
+    logger.info("Starting AI Code Agent GitHub App...")
     await init_db()
     logger.info("Database initialized")
     
     yield
     
     # Shutdown
-    logger.info("Shutting down AI Coding Agent GitHub App...")
+    logger.info("Shutting down AI Code Agent GitHub App...")
 
 
 # Create FastAPI app
@@ -79,7 +79,7 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 async def root() -> dict:
     """Root endpoint."""
     return {
-        "message": "AI Coding Agent GitHub App",
+        "message": "AI Code Agent GitHub App",
         "version": "1.0.0",
         "status": "running"
     }
