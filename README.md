@@ -1,4 +1,4 @@
-# AI Coding Agent
+# AI Code Agent
 
 Автоматизированный агент для разработки кода через GitHub Issues с использованием ИИ.
 
