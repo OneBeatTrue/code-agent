@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import aiohttp
 import requests
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 # Configuration will be passed as parameters instead of importing global config
 
@@ -33,12 +33,12 @@ class LLMClient:
             # Try to create OpenAI client with minimal parameters to avoid compatibility issues
 
             if openai_base_url:
-                self.openai_client = OpenAI(
+                self.openai_client = AsyncOpenAI(
                     api_key=openai_api_key,
                     base_url=openai_base_url,
                 )
             else:
-                self.openai_client = OpenAI(
+                self.openai_client = AsyncOpenAI(
                     api_key=openai_api_key
                 )
             # logger.info(f"HERE {self.openai_model}")
@@ -63,7 +63,7 @@ class LLMClient:
             raise ValueError(f"OpenAI client is not initialized")
         
         try:
-            response = self.openai_client.chat.completions.create(
+            response = await self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=messages,
                 max_tokens=max_tokens,
