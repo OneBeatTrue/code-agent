@@ -20,29 +20,34 @@ class LLMClient:
         self,
         openai_api_key: Optional[str] = None,
         openai_model: str = "gpt-4",    
-        openai_base_url: str = ""
+        openai_base_url: Optional[str] = None,
     ) -> None:
         """Initialize the LLM client."""
         self.openai_model = openai_model
-        self.openai_api_key = openai_api_key
-        self.openai_base_url = openai_base_url
+        # self.openai_api_key = openai_api_key
+        # self.openai_base_url = openai_base_url
 
         if not openai_api_key:
             raise ValueError("OpenAI API key is required")
         try:
             # Try to create OpenAI client with minimal parameters to avoid compatibility issues
-            self.openai_client = OpenAI(
-                api_key=openai_api_key,
-                base_url=openai_base_url
-            )
-            logger.info(f"HERE {self.openai_model}")
-            logger.info(f"HERE {self.openai_api_key}")
-            logger.info(f"HERE {self.openai_base_url}")
+
+            if openai_base_url:
+                self.openai_client = OpenAI(
+                    api_key=openai_api_key,
+                    base_url=openai_base_url,
+                )
+            else:
+                self.openai_client = OpenAI(
+                    api_key=openai_api_key
+                )
+            # logger.info(f"HERE {self.openai_model}")
+            # logger.info(f"HERE {self.openai_api_key}")
+            # logger.info(f"HERE {self.openai_base_url}")
 
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI client: {e}")
-            # Fallback: set to None and handle gracefully
-            self.openai_client = None
+            raise
 
     async def generate_response(
         self,
@@ -52,9 +57,9 @@ class LLMClient:
     ) -> str:
         """Generate response using OpenAI API."""
         if not self.openai_client:
-            logger.info(f"HERE {self.openai_model}")
-            logger.info(f"HERE {self.openai_api_key}")
-            logger.info(f"HERE {self.openai_base_url}")
+            # logger.info(f"HERE {self.openai_model}")
+            # logger.info(f"HERE {self.openai_api_key}")
+            # logger.info(f"HERE {self.openai_base_url}")
             raise ValueError(f"OpenAI client is not initialized")
         
         try:
