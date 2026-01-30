@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "supersecret").encode()
-logger.info(os.getenv("WEBHOOK_SECRET", "supersecret"))
 
 def verify_signature(payload_body: bytes, signature_header: str) -> bool:
     if not signature_header:
