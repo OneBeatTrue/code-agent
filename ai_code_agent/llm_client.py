@@ -34,7 +34,7 @@ class LLMClient:
                 base_url=openai_base_url
             )
         except Exception as e:
-            logger.error(f"Failed to initialize {openai_base_url} OpenAI client: {e}")
+            logger.error(f"Failed to initialize OpenAI client: {e}")
             # Fallback: set to None and handle gracefully
             self.openai_client = None
 
@@ -55,7 +55,7 @@ class LLMClient:
     ) -> str:
         """Generate response using OpenAI API."""
         if not self.openai_client:
-            raise ValueError("OpenAI client is not initialized")
+            raise ValueError(f"OpenAI client ({self.openai_base_url}) is not initialized")
         
         try:
             response = self.openai_client.chat.completions.create(
