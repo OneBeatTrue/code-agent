@@ -1,5 +1,5 @@
 services:
-  ai-coding-agent:
+  code-agent-service:
     build:
       context: .
       dockerfile: Dockerfile
